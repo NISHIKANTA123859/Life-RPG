@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Coins, ShoppingCart, Lock, CheckCircle2 } from "lucide-react";
 import { CHARACTER } from "../data/gameData";
+import { rpgEvents } from "../components/background/rpgEvents";
 
 type Rarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary";
 type Category = "All" | "Equipment" | "Boosts" | "Cosmetics" | "Skills";
@@ -53,6 +54,7 @@ export default function Shop({ character }: Props) {
   const handleBuy = (item: ShopItem) => {
     if (item.owned || gold < item.price) return;
     if (item.levelRequired && character.level < item.levelRequired) return;
+    rpgEvents.trigger("gold_gain");
     setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, owned: true } : i));
     setGold((g) => g - item.price);
     setBuyMsg(`Purchased ${item.name}!`);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Swords, Star, X, Zap } from "lucide-react";
+import { rpgEvents } from "./background/rpgEvents";
 
 interface Props {
   level: number;
@@ -21,6 +22,7 @@ export default function LevelUpModal({ level, onClose }: Props) {
   const [particles, setParticles] = useState<Particle[]>([]);
 
   useEffect(() => {
+    rpgEvents.trigger("level_up");
     const ps: Particle[] = Array.from({ length: 40 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,

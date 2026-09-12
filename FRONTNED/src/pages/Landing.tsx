@@ -59,7 +59,7 @@ const stats = [
 
 export default function Landing({ onEnter, onLogin }: Props) {
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: "#0B0D14" }}>
+    <div className="min-h-screen overflow-x-hidden bg-transparent">
       {/* Nav */}
       <nav className="sticky top-0 z-50 glass-card border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">

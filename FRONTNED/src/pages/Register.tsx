@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, ChevronLeft, Sword, Brain, Shield, Target, Star, Check } from "lucide-react";
+import { register as registerApi, storeToken } from "../lib/api";
 
 interface Props {
   onDone: () => void;
@@ -52,16 +53,27 @@ export default function Register({ onDone, onLogin }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const cls = CLASSES.find((c) => c.key === selectedClass)!;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setLoading(true);
-    setTimeout(() => { setLoading(false); onDone(); }, 1200);
+    setError("");
+
+    try {
+      const payload = await registerApi(name, email, password, password, selectedClass);
+      storeToken(payload.access_token);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#0B0D14" }}>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-transparent">
       <div className="absolute top-1/3 left-1/4 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style={{ background: `radial-gradient(circle, ${cls.color}, transparent)` }} />
 
       <div className="w-full max-w-2xl relative">

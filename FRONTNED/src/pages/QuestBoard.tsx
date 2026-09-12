@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, SlidersHorizontal, X, Clock, Coins, Zap, CheckCircle2 } from "lucide-react";
 import QuestCard from "../components/QuestCard";
 import { QUESTS_DATA } from "../data/gameData";
+import { getTasks, completeTask, createTask } from "../services/api";
 
 type Tab = "All" | "Today" | "Active" | "Completed";
 type Difficulty = "All" | "Easy" | "Medium" | "Hard" | "Epic";
@@ -43,11 +44,28 @@ export default function QuestBoard() {
   const [tab, setTab] = useState<Tab>("All");
   const [diffFilter, setDiffFilter] = useState<Difficulty>("All");
   const [search, setSearch] = useState("");
-  const [quests, setQuests] = useState(ALL_QUESTS);
+  const [quests, setQuests] = useState<any[]>(ALL_QUESTS);
   const [showCreate, setShowCreate] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<CreateQuestForm>({
     title: "", category: "Intellect", difficulty: "Easy", deadline: "", description: "",
   });
+
+  const loadQuests = () => {
+    setLoading(true);
+    getTasks()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setQuests(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadQuests();
+  }, []);
 
   const filtered = quests.filter((q) => {
     if (tab === "Today" && !q.deadline.startsWith("Today")) return false;
@@ -58,26 +76,45 @@ export default function QuestBoard() {
     return true;
   });
 
-  const handleComplete = (id: number, e: React.MouseEvent) => {
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    void rect;
-    setQuests((prev) => prev.map((q) => (q.id === id ? { ...q, completed: true } : q)));
+  const handleComplete = async (id: number, e: React.MouseEvent) => {
+    setQuests((prev) => prev.map((q) => (q.id === id ? { ...q, completed: true, status: "completed" } : q)));
+    try {
+      await completeTask(id);
+    } catch {}
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.title) return;
-    const xpMap = { Easy: 60, Medium: 120, Hard: 200, Epic: 350 };
-    const goldMap = { Easy: 20, Medium: 45, Hard: 80, Epic: 150 };
-    setQuests((prev) => [
-      ...prev,
-      {
-        id: Date.now(), icon: "⚡", title: form.title, category: form.category,
-        categoryColor: "#8B5CF6", difficulty: form.difficulty,
-        xp: xpMap[form.difficulty], gold: goldMap[form.difficulty],
-        attribute: "INT +1", deadline: form.deadline || "No deadline",
-        completed: false, description: form.description,
-      },
-    ]);
+    try {
+      const newQuest = await createTask({
+        name: form.title,
+        title: form.title,
+        description: form.description,
+        category: form.category,
+        difficulty: form.difficulty,
+        due_date: form.deadline,
+        deadline: form.deadline,
+      });
+
+      if (newQuest && newQuest.id) {
+        setQuests((prev) => [newQuest, ...prev.filter((q) => q.id !== newQuest.id)]);
+      } else {
+        loadQuests();
+      }
+    } catch {
+      const xpMap = { Easy: 60, Medium: 120, Hard: 200, Epic: 350 };
+      const goldMap = { Easy: 20, Medium: 45, Hard: 80, Epic: 150 };
+      setQuests((prev) => [
+        ...prev,
+        {
+          id: Date.now(), icon: "⚡", title: form.title, category: form.category,
+          categoryColor: "#8B5CF6", difficulty: form.difficulty,
+          xp: xpMap[form.difficulty], gold: goldMap[form.difficulty],
+          attribute: "INT +1", deadline: form.deadline || "No deadline",
+          completed: false, description: form.description,
+        },
+      ]);
+    }
     setForm({ title: "", category: "Intellect", difficulty: "Easy", deadline: "", description: "" });
     setShowCreate(false);
   };

@@ -1,4 +1,5 @@
 import { CheckCircle2, Clock, Coins, Zap } from "lucide-react";
+import { rpgEvents } from "./background/rpgEvents";
 
 type Difficulty = "Easy" | "Medium" | "Hard" | "Epic";
 
@@ -116,7 +117,12 @@ export default function QuestCard({ quest, onComplete }: Props) {
 
       {/* Complete button */}
       <button
-        onClick={(e) => !quest.completed && onComplete(quest.id, e)}
+        onClick={(e) => {
+          if (!quest.completed) {
+            rpgEvents.trigger("quest_complete", { x: e.clientX, y: e.clientY });
+            onComplete(quest.id, e);
+          }
+        }}
         className={`w-full py-2.5 rounded-xl text-sm font-display font-semibold transition-all duration-200 flex items-center justify-center gap-2 mt-1 ${
           quest.completed
             ? "bg-white/5 text-[#A0A4B8] cursor-default"

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Trophy, Flame, Zap, TrendingUp, Medal } from "lucide-react";
+import { getLeaderboard } from "../services/api";
 
 type Period = "Weekly" | "Monthly" | "All Time";
 
@@ -17,7 +18,7 @@ interface LeaderboardEntry {
 const makeEntry = (rank: number, name: string, avatar: string, cls: string, level: number, xp: number, streak: number, isYou = false): LeaderboardEntry =>
   ({ rank, name, avatar, class: cls, level, xp, streak, isYou });
 
-const WEEKLY: LeaderboardEntry[] = [
+const DEFAULT_ENTRIES: LeaderboardEntry[] = [
   makeEntry(1, "ZeroX_Nova",      "⚡", "Warrior",  52, 4_820, 21),
   makeEntry(2, "SilverPath",      "🌙", "Scholar",  48, 4_310, 18),
   makeEntry(3, "IronMind_VII",    "🔱", "Monk",     45, 3_990, 30),
@@ -30,37 +31,39 @@ const WEEKLY: LeaderboardEntry[] = [
   makeEntry(10, "ForgeHammer",    "🔨", "Warrior",  28, 2_390, 5),
 ];
 
-const MONTHLY: LeaderboardEntry[] = [
-  makeEntry(1, "ZeroX_Nova",      "⚡", "Warrior",  52, 18_200, 21),
-  makeEntry(2, "IronMind_VII",    "🔱", "Monk",     45, 16_800, 30),
-  makeEntry(3, "SilverPath",      "🌙", "Scholar",  48, 15_300, 18),
-  makeEntry(4, "RunnerPrime",     "🏃", "Ranger",   38, 13_400, 12),
-  makeEntry(5, "LightningStar",   "🌟", "Monk",     33, 12_100, 22),
-  makeEntry(6, "PhoenixWill",     "🦅", "Warrior",  35, 11_900, 9),
-  makeEntry(7, "CodeDragon",      "🐉", "Scholar",  41, 11_400, 14),
-  makeEntry(8, "ShadowCoder",     "💻", "Scholar",  30, 10_800, 7),
-  makeEntry(9, "Aria Thornwood",  "🧙‍♀️","Scholar",  24, 10_200, 14, true),
-  makeEntry(10, "ForgeHammer",    "🔨", "Warrior",  28, 9_500, 5),
-];
-
-const ALL_TIME = WEEKLY.map((e, i) => ({ ...e, xp: e.xp * 20 + i * 1000 }));
-
-const PERIOD_DATA: Record<Period, LeaderboardEntry[]> = {
-  Weekly: WEEKLY, Monthly: MONTHLY, "All Time": ALL_TIME,
-};
-
-const RANK_STYLES: Record<number, { bg: string; color: string; icon?: React.ReactNode }> = {
-  1: { bg: "rgba(245,185,44,0.15)", color: "#F5B92C", icon: <Medal size={16} fill="rgba(245,185,44,0.3)" className="text-yellow-400" /> },
-  2: { bg: "rgba(160,164,184,0.1)", color: "#A0A4B8", icon: <Medal size={16} className="text-[#A0A4B8]" /> },
-  3: { bg: "rgba(255,122,69,0.12)", color: "#FF7A45", icon: <Medal size={16} className="text-orange-400" /> },
-};
-
 export default function Leaderboard() {
   const [period, setPeriod] = useState<Period>("Weekly");
-  const data = PERIOD_DATA[period];
-  const PERIODS: Period[] = ["Weekly", "Monthly", "All Time"];
+  const [entries, setEntries] = useState<LeaderboardEntry[]>(DEFAULT_ENTRIES);
 
-  const youEntry = data.find((e) => e.isYou);
+  useEffect(() => {
+    getLeaderboard()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setEntries(
+            data.map((item, idx) => ({
+              rank: item.rank || idx + 1,
+              name: item.name || item.username || "Hero",
+              avatar: item.avatar || "⚔️",
+              class: item.class_name || item.class || "Scholar",
+              level: item.level || 1,
+              xp: item.xp || item.total_xp || 0,
+              streak: item.streak || item.current_streak || 0,
+              isYou: item.is_you || item.isYou || item.name === "Aria Thornwood",
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [period]);
+
+  const RANK_STYLES: Record<number, { bg: string; color: string; icon?: React.ReactNode }> = {
+    1: { bg: "rgba(245,185,44,0.15)", color: "#F5B92C", icon: <Medal size={16} fill="rgba(245,185,44,0.3)" className="text-yellow-400" /> },
+    2: { bg: "rgba(160,164,184,0.1)", color: "#A0A4B8", icon: <Medal size={16} className="text-[#A0A4B8]" /> },
+    3: { bg: "rgba(255,122,69,0.12)", color: "#FF7A45", icon: <Medal size={16} className="text-orange-400" /> },
+  };
+
+  const PERIODS: Period[] = ["Weekly", "Monthly", "All Time"];
+  const youEntry = entries.find((e) => e.isYou) || entries[4];
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -83,12 +86,12 @@ export default function Leaderboard() {
 
       {/* Top 3 podium */}
       <div className="flex items-end justify-center gap-4 mb-8">
-        {[data[1], data[0], data[2]].map((entry, podiumIndex) => {
+        {[(entries[1] || entries[0]), entries[0], (entries[2] || entries[0])].filter(Boolean).map((entry, podiumIndex) => {
           const visualRank = [2, 1, 3][podiumIndex];
           const heights = ["h-24", "h-32", "h-20"];
           const rankStyle = RANK_STYLES[visualRank] || { bg: "", color: "#A0A4B8" };
           return (
-            <div key={entry.name} className={`flex flex-col items-center gap-2 ${podiumIndex === 1 ? "scale-105" : ""}`}>
+            <div key={entry.name + podiumIndex} className={`flex flex-col items-center gap-2 ${podiumIndex === 1 ? "scale-105" : ""}`}>
               <div className="text-3xl">{entry.avatar}</div>
               <div className="font-display font-bold text-white text-xs text-center">{entry.name}</div>
               <div
@@ -124,7 +127,7 @@ export default function Leaderboard() {
 
       {/* Full list */}
       <div className="space-y-2">
-        {data.map((entry) => {
+        {entries.map((entry) => {
           const rankStyle = RANK_STYLES[entry.rank];
           return (
             <div

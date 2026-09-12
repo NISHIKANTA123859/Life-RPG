@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, Trophy } from "lucide-react";
+import { getAchievements } from "../services/api";
 
 type AchievementRarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary";
 
@@ -20,7 +21,7 @@ const RARITY_COLORS: Record<AchievementRarity, string> = {
   Common: "#A0A4B8", Uncommon: "#34D399", Rare: "#22D3EE", Epic: "#8B5CF6", Legendary: "#F5B92C",
 };
 
-const ACHIEVEMENTS: Achievement[] = [
+const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   { id: 1,  icon: "⚔️",  name: "First Blood",         desc: "Complete your very first quest.",                    rarity: "Common",    xp: 50,   unlocked: true,  date: "Sep 1, 2026" },
   { id: 2,  icon: "🔥",  name: "On Fire",              desc: "Maintain a 7-day quest streak.",                    rarity: "Uncommon",  xp: 150,  unlocked: true,  date: "Sep 8, 2026" },
   { id: 3,  icon: "🧠",  name: "Brainiac",             desc: "Reach Intellect level 50.",                         rarity: "Rare",      xp: 300,  unlocked: true,  date: "Aug 22, 2026" },
@@ -43,16 +44,40 @@ type Filter = "All" | "Unlocked" | "Locked" | AchievementRarity;
 
 export default function Achievements() {
   const [filter, setFilter] = useState<Filter>("All");
+  const [achievements, setAchievements] = useState<Achievement[]>(DEFAULT_ACHIEVEMENTS);
 
-  const filtered = ACHIEVEMENTS.filter((a) => {
+  useEffect(() => {
+    getAchievements()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAchievements(
+            data.map((item) => ({
+              id: item.id || item.key,
+              icon: item.icon || "🏆",
+              name: item.name || item.title,
+              desc: item.description || item.desc || "",
+              rarity: item.rarity || "Common",
+              xp: item.xp_reward || item.xp || 50,
+              unlocked: item.unlocked ?? item.is_unlocked ?? false,
+              progress: item.progress,
+              progressMax: item.requirement_value || item.progressMax,
+              date: item.unlocked_at ? new Date(item.unlocked_at).toLocaleDateString() : undefined,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const filtered = achievements.filter((a) => {
     if (filter === "Unlocked") return a.unlocked;
     if (filter === "Locked") return !a.unlocked;
     if (["Common", "Uncommon", "Rare", "Epic", "Legendary"].includes(filter)) return a.rarity === filter;
     return true;
   });
 
-  const unlockedCount = ACHIEVEMENTS.filter((a) => a.unlocked).length;
-  const totalXP = ACHIEVEMENTS.filter((a) => a.unlocked).reduce((sum, a) => sum + a.xp, 0);
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  const totalXP = achievements.filter((a) => a.unlocked).reduce((sum, a) => sum + a.xp, 0);
 
   const FILTERS: Filter[] = ["All", "Unlocked", "Locked", "Common", "Uncommon", "Rare", "Epic", "Legendary"];
 
@@ -64,9 +89,9 @@ export default function Achievements() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Unlocked", value: `${unlockedCount}/${ACHIEVEMENTS.length}`, color: "#34D399", icon: "🏆" },
+          { label: "Unlocked", value: `${unlockedCount}/${achievements.length}`, color: "#34D399", icon: "🏆" },
           { label: "Total XP", value: totalXP.toLocaleString(), color: "#8B5CF6", icon: "⚡" },
-          { label: "Completion", value: `${Math.round((unlockedCount / ACHIEVEMENTS.length) * 100)}%`, color: "#F5B92C", icon: "📊" },
+          { label: "Completion", value: `${Math.round((unlockedCount / (achievements.length || 1)) * 100)}%`, color: "#F5B92C", icon: "📊" },
         ].map((s) => (
           <div key={s.label} className="glass-card rounded-xl p-4 border border-white/8 text-center">
             <div className="text-2xl mb-1">{s.icon}</div>

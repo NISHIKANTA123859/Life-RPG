@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { CheckCircle2, Zap, Coins, Trophy, Star, TrendingUp } from "lucide-react";
+import { getActivity } from "../services/api";
 
 interface ActivityEvent {
   type: "quest" | "level" | "achievement" | "purchase" | "streak";
@@ -63,8 +65,30 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?
 };
 
 export default function ActivityHistory() {
-  const totalXPToday = HISTORY[0].events.reduce((sum, e) => sum + (e.xp || 0), 0);
-  const totalQuestsToday = HISTORY[0].events.filter((e) => e.type === "quest").length;
+  const [history, setHistory] = useState<DayGroup[]>(HISTORY);
+
+  useEffect(() => {
+    getActivity()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const events: ActivityEvent[] = data.map((act) => ({
+            type: act.activity_type || act.type || "quest",
+            icon: act.icon || "⚔️",
+            title: act.title || act.action || "Activity logged",
+            detail: act.description || act.detail || "Game event",
+            xp: act.xp_earned || act.xp || 0,
+            gold: act.gold_earned || act.gold || 0,
+            time: act.created_at ? new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+            color: "#8B5CF6",
+          }));
+          setHistory([{ date: "Recent Activity", isToday: true, events }]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const totalXPToday = history[0]?.events?.reduce((sum, e) => sum + (e.xp || 0), 0) || 0;
+  const totalQuestsToday = history[0]?.events?.filter((e) => e.type === "quest").length || 0;
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -87,7 +111,7 @@ export default function ActivityHistory() {
 
       {/* Timeline */}
       <div className="space-y-8">
-        {HISTORY.map((group) => (
+        {history.map((group) => (
           <div key={group.date}>
             <div className="flex items-center gap-3 mb-4">
               <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.06)" }} />

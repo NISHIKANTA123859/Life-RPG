@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Page } from "../App";
 import Sidebar from "../components/Sidebar";
 import TopBar from "../components/TopBar";
@@ -19,6 +19,7 @@ import Profile from "./Profile";
 import SettingsPage from "./Settings";
 import { Zap, Plus, Filter, CheckCircle2 } from "lucide-react";
 import { CHARACTER, QUESTS_DATA } from "../data/gameData";
+import { getCharacter, getTasks, completeTask } from "../services/api";
 export { CHARACTER, QUESTS_DATA };
 
 interface Props {
@@ -28,30 +29,85 @@ interface Props {
 
 function DashboardHome({
   onNavigate,
+  characterData,
+  onCharacterUpdate,
 }: {
   onNavigate: (p: Page) => void;
+  characterData: typeof CHARACTER;
+  onCharacterUpdate: (c: any) => void;
 }) {
-  const [quests, setQuests] = useState(QUESTS_DATA);
+  const [quests, setQuests] = useState<any[]>(QUESTS_DATA);
+  const [character, setCharacter] = useState<any>(characterData);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [floatingRewards, setFloatingRewards] = useState<
     { id: number; text: string; x: number; y: number }[]
   >([]);
 
-  const completedCount = quests.filter((q) => q.completed).length;
-  const xpPercent = Math.round((CHARACTER.currentXP / CHARACTER.maxXP) * 100);
+  useEffect(() => {
+    getCharacter()
+      .then((c) => {
+        if (c) {
+          setCharacter(c);
+          onCharacterUpdate(c);
+        }
+      })
+      .catch(() => {});
 
-  const handleCompleteQuest = (id: number, event: React.MouseEvent) => {
+    getTasks()
+      .then((qList) => {
+        if (Array.isArray(qList) && qList.length > 0) {
+          setQuests(qList);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const completedCount = quests.filter((q) => q.completed || q.status === "completed").length;
+  const currentXP = character.current_xp ?? character.currentXP ?? 0;
+  const maxXP = character.required_xp ?? character.maxXP ?? 1000;
+  const level = character.level ?? 1;
+  const xpPercent = Math.min(100, Math.round((currentXP / maxXP) * 100));
+
+  const handleCompleteQuest = async (id: number, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     const quest = quests.find((q) => q.id === id);
     if (!quest || quest.completed) return;
-    setQuests((prev) => prev.map((q) => (q.id === id ? { ...q, completed: true } : q)));
-    const rewardId = Date.now();
-    setFloatingRewards((prev) => [
-      ...prev,
-      { id: rewardId, text: `+${quest.xp} XP  +${quest.gold} 🪙`, x: rect.left + rect.width / 2, y: rect.top },
-    ]);
-    setTimeout(() => setFloatingRewards((prev) => prev.filter((r) => r.id !== rewardId)), 1600);
-    if (quest.difficulty === "Epic") setTimeout(() => setShowLevelUp(true), 800);
+
+    // Optimistic UI update
+    setQuests((prev) => prev.map((q) => (q.id === id ? { ...q, completed: true, status: "completed" } : q)));
+
+    try {
+      const res = await completeTask(id);
+      if (res) {
+        if (res.character) {
+          setCharacter((prev: any) => ({ ...prev, ...res.character }));
+          onCharacterUpdate((prev: any) => ({ ...prev, ...res.character }));
+        }
+
+        const xpGain = res.reward?.xp ?? quest.xp ?? 50;
+        const goldGain = res.reward?.gold ?? quest.gold ?? 20;
+
+        const rewardId = Date.now();
+        setFloatingRewards((prev) => [
+          ...prev,
+          { id: rewardId, text: `+${xpGain} XP  +${goldGain} 🪙`, x: rect.left + rect.width / 2, y: rect.top },
+        ]);
+        setTimeout(() => setFloatingRewards((prev) => prev.filter((r) => r.id !== rewardId)), 1600);
+
+        if (res.level_up) {
+          setTimeout(() => setShowLevelUp(true), 600);
+        }
+      }
+    } catch {
+      // Fallback local animation if API is offline
+      const rewardId = Date.now();
+      setFloatingRewards((prev) => [
+        ...prev,
+        { id: rewardId, text: `+${quest.xp ?? 50} XP  +${quest.gold ?? 20} 🪙`, x: rect.left + rect.width / 2, y: rect.top },
+      ]);
+      setTimeout(() => setFloatingRewards((prev) => prev.filter((r) => r.id !== rewardId)), 1600);
+      if (quest.difficulty === "Epic") setTimeout(() => setShowLevelUp(true), 800);
+    }
   };
 
   return (
@@ -62,14 +118,14 @@ function DashboardHome({
           <div>
             <div className="font-display text-xs uppercase tracking-[0.25em] text-violet-400 mb-1">Welcome Back, Hero</div>
             <h1 className="font-display font-bold text-white mb-2" style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)" }}>
-              {CHARACTER.name}
+              {character.name || CHARACTER.name}
             </h1>
             <div className="flex items-center gap-3">
               <span className="font-display text-xs uppercase tracking-widest px-3 py-1 rounded-full" style={{ background: "rgba(34,211,238,0.15)", color: "#22D3EE", border: "1px solid rgba(34,211,238,0.3)" }}>
-                {CHARACTER.class}
+                {character.class_name || character.class || CHARACTER.class}
               </span>
               <span className="font-display text-xs px-3 py-1 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6", border: "1px solid rgba(139,92,246,0.3)" }}>
-                Lv. {CHARACTER.level}
+                Lv. {level}
               </span>
             </div>
           </div>
@@ -91,15 +147,15 @@ function DashboardHome({
                 <span className="font-display text-sm font-semibold text-white">Experience Points</span>
               </div>
               <span className="font-display text-xs text-[#A0A4B8]">
-                {CHARACTER.currentXP.toLocaleString()} / {CHARACTER.maxXP.toLocaleString()} XP
+                {currentXP.toLocaleString()} / {maxXP.toLocaleString()} XP
               </span>
             </div>
             <div className="h-3 rounded-full bg-white/5 overflow-hidden mb-2">
               <div className="h-full rounded-full xp-bar-fill" style={{ background: "linear-gradient(90deg, #8B5CF6, #22D3EE)", width: `${xpPercent}%`, boxShadow: "0 0 12px rgba(139,92,246,0.6)" }} />
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-[#A0A4B8]">Level {CHARACTER.level}</span>
-              <span className="text-xs text-violet-400 font-semibold">{xpPercent}% to Level {CHARACTER.level + 1}</span>
+              <span className="text-xs text-[#A0A4B8]">Level {level}</span>
+              <span className="text-xs text-violet-400 font-semibold">{xpPercent}% to Level {level + 1}</span>
             </div>
           </div>
 
@@ -109,14 +165,14 @@ function DashboardHome({
                 <CheckCircle2 size={16} className="text-emerald-400" />
                 <span className="font-display text-sm font-semibold text-white">Daily Progress</span>
               </div>
-              <span className="font-display text-xs text-[#A0A4B8]">{completedCount}/{CHARACTER.dailyQuestsTotal} Quests</span>
+              <span className="font-display text-xs text-[#A0A4B8]">{completedCount}/{quests.length || CHARACTER.dailyQuestsTotal} Quests</span>
             </div>
             <div className="h-3 rounded-full bg-white/5 overflow-hidden mb-2">
-              <div className="h-full rounded-full transition-all duration-700" style={{ background: "linear-gradient(90deg, #34D399, #22D3EE)", width: `${(completedCount / CHARACTER.dailyQuestsTotal) * 100}%`, boxShadow: "0 0 12px rgba(52,211,153,0.5)" }} />
+              <div className="h-full rounded-full transition-all duration-700" style={{ background: "linear-gradient(90deg, #34D399, #22D3EE)", width: `${quests.length ? (completedCount / quests.length) * 100 : 0}%`, boxShadow: "0 0 12px rgba(52,211,153,0.5)" }} />
             </div>
             <div className="flex justify-between">
-              <span className="text-xs text-[#A0A4B8]">{CHARACTER.dailyQuestsTotal - completedCount} remaining</span>
-              <span className="text-xs text-emerald-400 font-semibold">{Math.round((completedCount / CHARACTER.dailyQuestsTotal) * 100)}% complete</span>
+              <span className="text-xs text-[#A0A4B8]">{(quests.length || CHARACTER.dailyQuestsTotal) - completedCount} remaining</span>
+              <span className="text-xs text-emerald-400 font-semibold">{quests.length ? Math.round((completedCount / quests.length) * 100) : 0}% complete</span>
             </div>
           </div>
         </div>
@@ -142,7 +198,7 @@ function DashboardHome({
 
         {/* Bottom row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <StreakWidget streak={CHARACTER.streak} />
+          <StreakWidget streak={character.current_streak ?? character.streak ?? CHARACTER.streak} />
           <CharacterStats />
         </div>
       </div>
@@ -157,13 +213,22 @@ function DashboardHome({
         </div>
       ))}
 
-      {showLevelUp && <LevelUpModal level={CHARACTER.level + 1} onClose={() => setShowLevelUp(false)} />}
+      {showLevelUp && <LevelUpModal level={level + 1} onClose={() => setShowLevelUp(false)} />}
     </>
   );
 }
 
 export default function Dashboard({ currentPage, onNavigate }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [character, setCharacter] = useState<any>(CHARACTER);
+
+  useEffect(() => {
+    getCharacter()
+      .then((c) => {
+        if (c) setCharacter(c);
+      })
+      .catch(() => {});
+  }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -172,21 +237,21 @@ export default function Dashboard({ currentPage, onNavigate }: Props) {
       case "skills":      return <SkillTree />;
       case "ai-intel":    return <QuestIntelligence />;
       case "achievements":return <Achievements />;
-      case "shop":        return <Shop character={CHARACTER} />;
+      case "shop":        return <Shop character={character} />;
       case "inventory":   return <Inventory />;
       case "activity":    return <ActivityHistory />;
       case "leaderboard": return <Leaderboard />;
-      case "profile":     return <Profile character={CHARACTER} onNavigate={onNavigate} />;
+      case "profile":     return <Profile character={character} onNavigate={onNavigate} />;
       case "settings":    return <SettingsPage />;
-      default:            return <DashboardHome onNavigate={onNavigate} />;
+      default:            return <DashboardHome onNavigate={onNavigate} characterData={character} onCharacterUpdate={setCharacter} />;
     }
   };
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0B0D14" }}>
+    <div className="flex h-screen overflow-hidden bg-transparent">
       <Sidebar currentPage={currentPage} onNavigate={onNavigate} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <TopBar character={CHARACTER} onMenuClick={() => setSidebarOpen(true)} onNavigate={onNavigate} />
+        <TopBar character={character} onMenuClick={() => setSidebarOpen(true)} onNavigate={onNavigate} />
         <main className="flex-1 overflow-y-auto">
           {renderPage()}
         </main>

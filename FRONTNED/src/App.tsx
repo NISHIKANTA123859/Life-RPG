@@ -3,6 +3,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import { RPGBackground } from "./components/background/RPGBackground";
 
 export type Page =
   | "landing"
@@ -24,20 +25,32 @@ export type Page =
 export default function App() {
   const [page, setPage] = useState<Page>("landing");
 
-  if (page === "landing") {
-    return (
-      <Landing
-        onEnter={() => setPage("dashboard")}
-        onLogin={() => setPage("login")}
-      />
-    );
-  }
-  if (page === "login") {
-    return <Login onLogin={() => setPage("dashboard")} onRegister={() => setPage("register")} />;
-  }
-  if (page === "register") {
-    return <Register onDone={() => setPage("dashboard")} onLogin={() => setPage("login")} />;
-  }
+  const renderContent = () => {
+    if (page === "landing") {
+      return (
+        <Landing
+          onEnter={() => setPage("dashboard")}
+          onLogin={() => setPage("login")}
+        />
+      );
+    }
+    if (page === "login") {
+      return <Login onLogin={() => setPage("dashboard")} onRegister={() => setPage("register")} />;
+    }
+    if (page === "register") {
+      return <Register onDone={() => setPage("dashboard")} onLogin={() => setPage("login")} />;
+    }
 
-  return <Dashboard currentPage={page} onNavigate={setPage} />;
+    return <Dashboard currentPage={page} onNavigate={setPage} />;
+  };
+
+  return (
+    <>
+      <RPGBackground currentPage={page} />
+      <div className="relative z-10 min-h-screen">
+        {renderContent()}
+      </div>
+    </>
+  );
 }
+

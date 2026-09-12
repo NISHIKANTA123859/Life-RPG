@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, Sword, Zap } from "lucide-react";
+import { apiFetch, login as loginApi, storeToken } from "../lib/api";
 
 interface Props {
   onLogin: () => void;
@@ -7,21 +8,31 @@ interface Props {
 }
 
 export default function Login({ onLogin, onRegister }: Props) {
-  const [email, setEmail] = useState("aria@liferp.gg");
-  const [password, setPassword] = useState("••••••••••");
+  const [email, setEmail] = useState("aria@liferpg.gg");
+  const [password, setPassword] = useState("password123");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { setLoading(false); onLogin(); }, 900);
+    setError("");
+
+    try {
+      const payload = await loginApi(email, password);
+      storeToken(payload.access_token);
+      onLogin();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{ background: "#0B0D14" }}
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-transparent"
     >
       {/* Background glows */}
       <div className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ background: "radial-gradient(circle, #8B5CF6, transparent)" }} />
@@ -85,6 +96,12 @@ export default function Login({ onLogin, onRegister }: Props) {
                 Forgot password?
               </button>
             </div>
+
+            {error && (
+              <div className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+                {error}
+              </div>
+            )}
 
             <button
               type="submit"

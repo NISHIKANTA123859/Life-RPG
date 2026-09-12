@@ -30,3 +30,20 @@ pnpm-debug.log*
 .vscode/
 *.swp
 *.swo
+
+# Virtual Environments
+.venv/
+venv/
+**/venv/
+**/.venv/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python & Backups
+__pycache__/
+**/__pycache__/
+*.bak
+

@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { getCharacterStats } from "../services/api";
 
-const ATTRIBUTES = [
+const DEFAULT_ATTRIBUTES = [
   { stat: "Intellect", value: 78, max: 100, color: "#22D3EE" },
   { stat: "Strength",  value: 45, max: 100, color: "#F0466B" },
   { stat: "Health",    value: 62, max: 100, color: "#34D399" },
@@ -9,9 +11,33 @@ const ATTRIBUTES = [
   { stat: "Endurance", value: 53, max: 100, color: "#FF7A45" },
 ];
 
-const radarData = ATTRIBUTES.map((a) => ({ subject: a.stat, A: a.value }));
-
 export default function CharacterStats() {
+  const [attributes, setAttributes] = useState(DEFAULT_ATTRIBUTES);
+  const [className, setClassName] = useState("Scholar Class");
+  const [combatPower, setCombatPower] = useState(4820);
+
+  useEffect(() => {
+    getCharacterStats()
+      .then((data) => {
+        if (data) {
+          if (data.class_name) setClassName(`${data.class_name} Class`);
+          if (data.combat_power || data.power) setCombatPower(data.combat_power || data.power);
+          const raw = data.stats || data.attributes || data;
+          setAttributes([
+            { stat: "Intellect",  value: raw.intellect ?? 78,  max: 100, color: "#22D3EE" },
+            { stat: "Strength",   value: raw.strength ?? 45,   max: 100, color: "#F0466B" },
+            { stat: "Health",     value: raw.health ?? 62,     max: 100, color: "#34D399" },
+            { stat: "Mind",       value: raw.mind ?? 85,       max: 100, color: "#8B5CF6" },
+            { stat: "Discipline", value: raw.discipline ?? 70, max: 100, color: "#F5B92C" },
+            { stat: "Endurance",  value: raw.endurance ?? 53,  max: 100, color: "#FF7A45" },
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const radarData = attributes.map((a) => ({ subject: a.stat, A: a.value }));
+
   return (
     <div className="glass-card rounded-2xl p-5 border border-white/8">
       <div className="flex items-center justify-between mb-5">
@@ -20,7 +46,7 @@ export default function CharacterStats() {
           className="text-xs px-2.5 py-1 rounded-full font-display"
           style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6", border: "1px solid rgba(139,92,246,0.3)" }}
         >
-          Scholar Class
+          {className}
         </span>
       </div>
 
@@ -48,7 +74,7 @@ export default function CharacterStats() {
 
         {/* Attribute bars */}
         <div className="flex-1 space-y-3 w-full">
-          {ATTRIBUTES.map((attr) => (
+          {attributes.map((attr) => (
             <div key={attr.stat}>
               <div className="flex items-center justify-between mb-1">
                 <span className="font-display text-xs text-[#A0A4B8] uppercase tracking-wider">{attr.stat}</span>
@@ -78,9 +104,10 @@ export default function CharacterStats() {
         <span className="text-xs text-[#A0A4B8]">Combat Power</span>
         <div className="flex items-center gap-2">
           <div className="h-1 w-16 rounded-full" style={{ background: "linear-gradient(90deg, #8B5CF6, #22D3EE)" }} />
-          <span className="font-display font-bold grad-primary-text text-sm">4,820</span>
+          <span className="font-display font-bold grad-primary-text text-sm">{combatPower.toLocaleString()}</span>
         </div>
       </div>
     </div>
   );
 }
+
