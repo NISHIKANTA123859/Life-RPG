@@ -1,0 +1,11 @@
+{
+  "title": "Life RPG",
+  "description": "Gamify your life with quests, habits, stats, and rewards in Life RPG.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
