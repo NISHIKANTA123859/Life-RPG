@@ -57,19 +57,7 @@ app = FastAPI(
 
 
 # ── CORS ─────────────────────────────────────────────────────────────
-origins_raw = os.getenv(
-    "CORS_ORIGINS",
-    '["http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173","http://localhost:8443"]',
-)
-try:
-    origins = json.loads(origins_raw)
-except Exception:
-    origins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://localhost:8443",
-    ]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

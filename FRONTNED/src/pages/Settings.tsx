@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { logout } from "../services/api";
 import { User, Palette, Bell, Accessibility, ChevronRight, Shield, LogOut } from "lucide-react";
 
 interface ToggleSetting {
@@ -128,7 +129,7 @@ export default function SettingsPage() {
             <div className="px-4 py-2.5 border-b border-white/5">
               <span className="text-xs text-[#F0466B] font-display uppercase tracking-wider">Danger Zone</span>
             </div>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[#F0466B] hover:bg-red-500/10 transition-colors">
+            <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[#F0466B] hover:bg-red-500/10 transition-colors" onClick={logout}>
               <LogOut size={15} /> Log Out
             </button>
             <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[#F0466B] hover:bg-red-500/10 transition-colors border-t border-white/5">

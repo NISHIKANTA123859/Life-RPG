@@ -9,6 +9,9 @@ class UserRegister(BaseModel):
     confirm_password: Optional[str] = None
     character_class: Optional[str] = "Scholar"
 
+    class Config:
+        extra = "ignore"
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

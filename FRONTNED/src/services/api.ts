@@ -1,206 +1,168 @@
-import axios from 'axios';
+// src/services/api.ts
 
-export const AUTH_TOKEN_KEY = 'life_rpg_access_token';
+import axios from "axios";
+import type { AxiosInstance } from "axios";
 
-// Create base Axios instance targeting FastAPI backend
-export const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+// Base URL for FastAPI backend
+const api: AxiosInstance = axios.create({
+  baseURL: "http://localhost:8000/api",
+  withCredentials: true,
 });
 
-// Token helpers
-export function getStoredToken(): string | null {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
-}
-
-export function storeToken(token: string): void {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-}
-
-// Request Interceptor: Attach JWT Bearer token
+// Request interceptor – attach JWT token if present
 api.interceptors.request.use((config) => {
-  const token = getStoredToken();
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem("access_token");
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers["Authorization"] = `Bearer ${token}`;
   }
   return config;
 });
 
-// Response Interceptor: Handle 401 Unauthorized cleanly
+// Response interceptor – handle auth errors globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      clearToken();
+    if (error.response?.status === 401) {
+      // Token invalid or expired – clear and redirect to login
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
 );
 
-// ── Auth APIs ────────────────────────────────────────────────────────
-export async function register(data: {
-  name: string;
-  email: string;
-  password: string;
-  confirm_password?: string;
-  character_class?: string;
-}) {
-  const res = await api.post('/auth/register', data);
-  if (res.data?.access_token) {
-    storeToken(res.data.access_token);
+/*** AUTH ***/
+export const register = async (
+  name: string,
+  email: string,
+  password: string,
+  confirmPassword: string,
+  characterClass: string
+) => {
+  console.log('Register payload ->', {
+    name,
+    email,
+    password,
+    confirm_password: confirmPassword,
+    character_class: characterClass,
+  });
+  const payload = {
+    name,
+    email,
+    password,
+    confirm_password: confirmPassword,
+    character_class: characterClass,
+  };
+  const response = await api.post("/auth/register", payload);
+  const { access_token, refresh_token } = response.data;
+  if (access_token) {
+    localStorage.setItem("access_token", access_token);
   }
-  return res.data;
-}
-
-export async function login(email: string, password: string) {
-  const res = await api.post('/auth/login', { email, password });
-  if (res.data?.access_token) {
-    storeToken(res.data.access_token);
+  if (refresh_token) {
+    localStorage.setItem("refresh_token", refresh_token);
   }
-  return res.data;
-}
+  return response.data;
+};
 
-export async function getCurrentUser() {
-  const res = await api.get('/auth/me');
-  return res.data;
-}
+export const login = async (email: string, password: string) => {
+  const response = await api.post("/auth/login", { email, password });
+  const { access_token, refresh_token } = response.data;
+  localStorage.setItem("access_token", access_token);
+  localStorage.setItem("refresh_token", refresh_token);
+  return response.data;
+};
 
-// ── Character APIs ───────────────────────────────────────────────────
-export async function getCharacter() {
-  const res = await api.get('/character');
-  return res.data;
-}
+export const logout = () => {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  window.location.href = "/login";
+};
 
-export async function getCharacterStats() {
-  const res = await api.get('/character/stats');
-  return res.data;
-}
+export const getCurrentUser = async () => {
+  const response = await api.get("/auth/me");
+  return response.data;
+};
 
-// ── Tasks / Quests APIs ──────────────────────────────────────────────
-export async function getTasks() {
-  const res = await api.get('/tasks');
-  return res.data;
-}
+/*** CHARACTER ***/
+export const getCharacter = async () => {
+  const response = await api.get("/character");
+  return response.data;
+};
 
-export const getQuests = getTasks;
+export const getCharacterStats = async () => {
+  const response = await api.get("/character/stats");
+  return response.data;
+};
 
-export async function getTask(id: number) {
-  const res = await api.get(`/tasks/${id}`);
-  return res.data;
-}
+/*** QUESTS / TASKS ***/
+export const getTasks = async () => {
+  const response = await api.get("/tasks");
+  return response.data;
+};
 
-export async function createTask(data: {
-  title?: string;
-  name?: string;
-  description?: string;
-  category?: string;
-  difficulty?: string;
-  due_date?: string;
-  deadline?: string;
-  estimated_time?: string;
-  attribute?: string;
-  xp_reward?: number;
-  gold_reward?: number;
-  attribute_reward?: number;
-}) {
-  const res = await api.post('/tasks', data);
-  return res.data;
-}
+export const getTask = async (id: number) => {
+  const response = await api.get(`/tasks/${id}`);
+  return response.data;
+};
 
-export const createQuest = createTask;
+export const createTask = async (payload: any) => {
+  const response = await api.post("/tasks", payload);
+  return response.data;
+};
 
-export async function updateTask(id: number, data: Partial<{
-  title: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  due_date: string;
-  status: string;
-}>) {
-  const res = await api.put(`/tasks/${id}`, data);
-  return res.data;
-}
+export const updateTask = async (id: number, payload: any) => {
+  const response = await api.put(`/tasks/${id}`, payload);
+  return response.data;
+};
 
-export async function deleteTask(id: number) {
-  const res = await api.delete(`/tasks/${id}`);
-  return res.data;
-}
+export const deleteTask = async (id: number) => {
+  const response = await api.delete(`/tasks/${id}`);
+  return response.data;
+};
 
-export async function completeTask(id: number) {
-  const res = await api.post(`/tasks/${id}/complete`);
-  return res.data;
-}
+export const completeTask = async (id: number) => {
+  const response = await api.post(`/tasks/${id}/complete`);
+  return response.data;
+};
 
-export const completeQuest = completeTask;
+/*** PROGRESS ***/
+export const getDailyProgress = async () => {
+  const response = await api.get("/daily-progress");
+  return response.data;
+};
 
-// ── Daily Progress & Streak APIs ─────────────────────────────────────
-export async function getDailyProgress() {
-  const res = await api.get('/daily-progress');
-  return res.data;
-}
+export const getStreak = async () => {
+  const response = await api.get("/streak");
+  return response.data;
+};
 
-export async function getStreak() {
-  const res = await api.get('/streak');
-  return res.data;
-}
+/*** ACTIVITY & ACHIEVEMENTS ***/
+export const getActivity = async () => {
+  const response = await api.get("/activity");
+  return response.data;
+};
 
-// ── Activity, Achievements, Leaderboard & ML Recommendations ────────
-export async function getActivity() {
-  const res = await api.get('/activity');
-  return res.data;
-}
+export const getAchievements = async () => {
+  const response = await api.get("/achievements");
+  return response.data;
+};
 
-export const getActivities = getActivity;
+/*** LEADERBOARD ***/
+export const getLeaderboard = async () => {
+  const response = await api.get("/leaderboard");
+  return response.data;
+};
 
-export async function getAchievements() {
-  const res = await api.get('/achievements');
-  return res.data;
-}
+/*** RECOMMENDATIONS ***/
+export const getRecommendations = async (limit?: number) => {
+  const response = await api.get("/recommendations", { params: { limit } });
+  return response.data;
+};
 
-export async function getLeaderboard() {
-  const res = await api.get('/leaderboard');
-  return res.data;
-}
-
-export async function getRecommendations() {
-  const res = await api.get('/recommendations');
-  return res.data;
-}
-
-// ── Quest Intelligence APIs ──────────────────────────────────────────
-export async function getQuestRecommendations() {
-  const res = await api.get('/quest-intelligence/recommendations');
-  return res.data;
-}
-
-export async function getQuestInsights() {
-  const res = await api.get('/quest-intelligence/insights');
-  return res.data;
-}
-
-export async function getWeeklyCompletion() {
-  const res = await api.get('/quest-intelligence/weekly-completion');
-  return res.data;
-}
-
-export async function getAttributeBalance() {
-  const res = await api.get('/quest-intelligence/attribute-balance');
-  return res.data;
-}
-
-export async function addRecommendationToQuestBoard(id: number) {
-  const res = await api.post(`/quest-intelligence/recommendations/${id}/add`);
-  return res.data;
-}
-
-// ── Seed Demo Data API ───────────────────────────────────────────────
-export async function seedDemoData() {
-  const res = await api.post('/seed');
-  return res.data;
-}
+/*** SEED DATA ***/
+export const seedDemoData = async () => {
+  const response = await api.post("/seed");
+  return response.data;
+};

@@ -209,8 +209,10 @@ export default function Register({ onDone, onLogin }: Props) {
                   { label: "Password", placeholder: "Create a strong password...", value: password, setter: setPassword, type: "password" },
                 ].map((field) => (
                   <div key={field.label}>
-                    <label className="text-xs text-[#A0A4B8] uppercase tracking-wider mb-1.5 block">{field.label}</label>
+                    <label htmlFor={field.label.replace(/\s+/g, '-').toLowerCase()} className="text-xs text-[#A0A4B8] uppercase tracking-wider mb-1.5 block">{field.label}</label>
                     <input
+                      id={field.label.replace(/\s+/g, '-').toLowerCase()}
+                      name={field.label.replace(/\s+/g, '_').toLowerCase()}
                       type={field.type}
                       placeholder={field.placeholder}
                       value={field.value}
